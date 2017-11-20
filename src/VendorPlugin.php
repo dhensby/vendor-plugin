@@ -104,8 +104,8 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
             foreach ($folders as $folder) {
                 $io->write("  - <info>$folder</info>");
                 $exposeMethod->exposeDirectory(
-                    Util::joinPaths($this->getProjectPath(), $module->getInstallPath(), $folder),
-                    Util::joinPaths($this->getProjectPath(), $module->getResourcePath(), $folder)
+                    Util::joinPaths($module->getInstallPath(), $folder),
+                    Util::joinPaths($module->getResourcePath(), $folder)
                 );
             }
         }
@@ -126,9 +126,8 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
         $iterator = new RecursiveIteratorIterator($files);
         /** @var \DirectoryIterator $file */
         foreach ($iterator as $file) {
-            if ($file->isDir()) {
-                $fileMap[] = $file->getBasename();
-            }
+            echo "checking {$file->getPathname()}" . PHP_EOL;
+            $fileMap[] = $file->getPath();
         }
         return $fileMap;
     }
