@@ -87,12 +87,8 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
             return null;
         }
 
-        // Find project path
-        $projectPath = $this->getProjectPath();
-        $name = $package->getName();
-
         // Build module
-        return new VendorModule($projectPath, $name);
+        return VendorModule::createFromEvent($event);
     }
 
     /**

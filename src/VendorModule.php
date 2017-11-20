@@ -2,6 +2,14 @@
 
 namespace SilverStripe\VendorPlugin;
 
+use Composer\Composer;
+use Composer\DependencyResolver\Operation\InstallOperation;
+use Composer\DependencyResolver\Operation\UninstallOperation;
+use Composer\DependencyResolver\Operation\UpdateOperation;
+use Composer\Installer\PackageEvent;
+use Composer\Package\PackageInterface;
+use Composer\Package\RootPackageInterface;
+use Composer\Script\Event;
 use Composer\Json\JsonFile;
 use LogicException;
 use SilverStripe\VendorPlugin\Methods\ExposeMethod;
@@ -22,29 +30,58 @@ class VendorModule
     const DEFAULT_SOURCE = 'vendor';
 
     /**
-     * Project root
-     *
-     * @var string
+     * @var PackageInterface
      */
-    protected $basePath = null;
+    protected $package = null;
 
     /**
-     * Module name
-     *
-     * @var string
+     * @var Composer
      */
-    protected $name = null;
+    protected $composer = null;
 
     /**
      * Build a vendor module library
      *
-     * @param string $basePath Project root folder
-     * @param string $name Composer name of this library
+     * @param PackageInterface $package The package being installed
+     * @param Composer $composer
      */
-    public function __construct($basePath, $name)
+    public function __construct($package, $composer)
     {
-        $this->basePath = $basePath;
-        $this->name = $name;
+        $this->package = $package;
+        $this->composer = $composer;
+    }
+
+    public static function createFromEvent(PackageEvent $event)
+    {
+        $composer = $event->getComposer();
+        $operation = $event->getOperation();
+        if ($operation instanceof InstallOperation || $operation instanceof UninstallOperation) {
+            $package = $operation->getPackage();
+        } elseif ($operation instanceof UpdateOperation) {
+            $package = $operation->getTargetPackage();
+        } else {
+            return null;
+        }
+        return new static(
+            $package,
+            $composer
+        );
+    }
+
+    /**
+     * @return PackageInterface
+     */
+    public function getPackage()
+    {
+        return $this->package;
+    }
+
+    /**
+     * @return Composer
+     */
+    public function getComposer()
+    {
+        return $this->composer;
     }
 
     /**
@@ -54,7 +91,7 @@ class VendorModule
      */
     public function getName()
     {
-        return $this->name;
+        return $this->package->getName();
     }
 
     /**
@@ -65,6 +102,14 @@ class VendorModule
      */
     public function getModulePath($base = self::DEFAULT_SOURCE)
     {
+        $installPath = $this->getComposer()->getInstallationManager()->getInstallPath($this->getPackage());
+        var_export($installPath);
+        if ($this->getPackage() instanceof RootPackageInterface && $base === self::DEFAULT_SOURCE) {
+            return Util::joinPaths(
+                $this->basePath,
+                $this->composer->getPackage()->getTargetDir()
+            );
+        }
         return Util::joinPaths(
             $this->basePath,
             $base,
@@ -110,18 +155,17 @@ class VendorModule
      */
     public function getExposedFolders()
     {
-        $data = $this->getJson();
-
         // Only expose if correct type
-        if (empty($data['type']) || $data['type'] !== VendorPlugin::MODULE_TYPE) {
+        if ($this->getPackage()->getType() !== VendorPlugin::MODULE_TYPE) {
             return [];
         }
 
+        $extra = $this->getPackage()->getExtra();
         // Get all dirs to expose
-        if (empty($data['extra']['expose'])) {
+        if (empty($extra['expose'])) {
             return [];
         }
-        $expose = $data['extra']['expose'];
+        $expose = $extra['expose'];
 
         // Validate all paths are safe
         foreach ($expose as $exposeFolder) {
