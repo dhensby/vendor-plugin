@@ -6,7 +6,6 @@ use Composer\Composer;
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\DependencyResolver\Operation\UninstallOperation;
 use Composer\DependencyResolver\Operation\UpdateOperation;
-use Composer\Installer\PackageEvent;
 use Composer\Package\PackageInterface;
 use Composer\Package\RootPackageInterface;
 use Composer\Script\Event;
@@ -51,23 +50,6 @@ class VendorModule
         $this->composer = $composer;
     }
 
-    public static function createFromEvent(PackageEvent $event)
-    {
-        $composer = $event->getComposer();
-        $operation = $event->getOperation();
-        if ($operation instanceof InstallOperation || $operation instanceof UninstallOperation) {
-            $package = $operation->getPackage();
-        } elseif ($operation instanceof UpdateOperation) {
-            $package = $operation->getTargetPackage();
-        } else {
-            return null;
-        }
-        return new static(
-            $package,
-            $composer
-        );
-    }
-
     /**
      * @return PackageInterface
      */
@@ -91,42 +73,39 @@ class VendorModule
      */
     public function getName()
     {
-        return $this->package->getName();
+        return $this->getPackage()->getName();
+    }
+
+    public function isProject()
+    {
+        return $this->getPackage() instanceof RootPackageInterface;
     }
 
     /**
      * Get full path to the root install for this project
      *
-     * @param string $base Rewrite root (or 'vendor' for actual module path)
      * @return string Path for this module
      */
-    public function getModulePath($base = self::DEFAULT_SOURCE)
+    public function getInstallPath()
     {
-        $installPath = $this->getComposer()->getInstallationManager()->getInstallPath($this->getPackage());
-        var_export($installPath);
-        if ($this->getPackage() instanceof RootPackageInterface && $base === self::DEFAULT_SOURCE) {
-            return Util::joinPaths(
-                $this->basePath,
-                $this->composer->getPackage()->getTargetDir()
-            );
+        if ($this->isProject()) {
+            return $this->getPackage()->getTargetDir();
         }
-        return Util::joinPaths(
-            $this->basePath,
-            $base,
-            explode('/', $this->name)
-        );
+        return $this->getComposer()->getInstallationManager()->getInstallPath($this->getPackage());
     }
 
     /**
-     * Get json content for this module from composer.json
-     *
-     * @return array
+     * @return string
      */
-    protected function getJson()
+    public function getResourcePath()
     {
-        $composer = Util::joinPaths($this->getModulePath(), 'composer.json');
-        $file = new JsonFile($composer);
-        return $file->read();
+        $path = $this->getComposer()->getInstallationManager()->getInstallPath($this->getPackage());
+        $parts = explode(DIRECTORY_SEPARATOR, $path);
+
+        $basePath = $this->getComposer()->getPackage()->getTargetDir();
+        $projectParts = array_slice($parts, -2);
+
+        return Util::joinPaths($basePath, 'resources', $projectParts);
     }
 
     /**
@@ -135,11 +114,11 @@ class VendorModule
      * @param ExposeMethod $method
      * @param string $target Replacement target for 'vendor' prefix to rewrite to. Defaults to 'resources'
      */
-    public function exposePaths(ExposeMethod $method, $target = self::DEFAULT_TARGET)
+    public function exposePaths(ExposeMethod $method)
     {
         $folders = $this->getExposedFolders();
-        $sourcePath = $this->getModulePath(self::DEFAULT_SOURCE);
-        $targetPath = $this->getModulePath($target);
+        $sourcePath = $this->getInstallPath();
+        $targetPath = $this->getResourcePath();
         foreach ($folders as $folder) {
             // Get paths for this folder and delegate to expose method
             $folderSourcePath = Util::joinPaths($sourcePath, $folder);

@@ -3,17 +3,15 @@
 namespace SilverStripe\VendorPlugin;
 
 use Composer\Composer;
-use Composer\DependencyResolver\Operation\InstallOperation;
-use Composer\DependencyResolver\Operation\UninstallOperation;
-use Composer\DependencyResolver\Operation\UpdateOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Factory;
 use Composer\Installer\PackageEvent;
 use Composer\IO\IOInterface;
-use Composer\Package\PackageInterface;
 use Composer\Plugin\PluginInterface;
+use Composer\Script\Event;
 use Composer\Util\Filesystem;
-use DirectoryIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use SilverStripe\VendorPlugin\Methods\CopyMethod;
 use SilverStripe\VendorPlugin\Methods\ExposeMethod;
 use SilverStripe\VendorPlugin\Methods\ChainedMethod;
@@ -67,28 +65,68 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'post-package-update' => 'installPackage',
-            'post-package-install' => 'installPackage',
-            'pre-package-uninstall' => 'uninstallPackage',
+            'post-install-command' => 'updateResources',
+            'post-update-command' => 'updateResources',
         ];
     }
 
     /**
      * Get vendor module instance for this event
      *
-     * @param PackageEvent $event
-     * @return VendorModule
+     * @param Event $event
+     * @return VendorModule|null
      */
-    protected function getVendorModule(PackageEvent $event)
+    protected function getVendorModule(Event $event)
     {
-        // Ensure package is the valid type
-        $package = $this->getOperationPackage($event);
-        if (!$package || $package->getType() !== self::MODULE_TYPE) {
-            return null;
-        }
-
         // Build module
         return VendorModule::createFromEvent($event);
+    }
+
+    /**
+     * @param Event $event
+     */
+    public function updateResources(Event $event)
+    {
+        $composer = $event->getComposer();
+        // map all existing resources
+        $existingResources = $this->mapExistingResources(
+            Util::joinPaths($composer->getPackage()->getTargetDir(), 'resources')
+        );
+        var_export($existingResources); die;
+        // iterate over all modules (including root module)
+        $repo = $composer->getRepositoryManager()->getLocalRepository();
+        $io = $event->getIO();
+        foreach ($repo->getPackages() as $package) {
+            if ($package->getType() !== self::MODULE_TYPE) {
+                continue;
+            }
+            $module = new VendorModule($package, $event->getComposer());
+            if ($module) {
+                $name = $module->getName();
+                $io->write("Exposing web directories for module <info>{$name}</info>:");
+            }
+        }
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return array
+     */
+    protected function mapExistingResources($path)
+    {
+        $fileMap = [];
+        if (!file_exists($path)) {
+            return $fileMap;
+        }
+        $files = new RecursiveDirectoryIterator($path);
+        $iterator = new RecursiveIteratorIterator($files);
+        /** @var \DirectoryIterator $file */
+        foreach ($iterator as $file) {
+            echo "checking {$file->getFilename()}" . PHP_EOL;
+            $fileMap[] = $file->getPath();
+        }
+        return $fileMap;
     }
 
     /**
@@ -169,7 +207,7 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
         }
 
         // Check path to remove
-        $target = $module->getModulePath(VendorModule::DEFAULT_TARGET);
+        $target = $module->getResourcePath();
         if (!is_dir($target)) {
             return;
         }
@@ -205,26 +243,5 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
                 // Default to safe-failover method
                 return new ChainedMethod(new SymlinkMethod(), new CopyMethod());
         }
-    }
-
-    /**
-     * Get target package from operation
-     *
-     * @param PackageEvent $event
-     * @return PackageInterface
-     */
-    protected function getOperationPackage(PackageEvent $event)
-    {
-        $operation = $event->getOperation();
-        if ($operation instanceof UpdateOperation) {
-            return $operation->getTargetPackage();
-        }
-        if ($operation instanceof InstallOperation) {
-            return $operation->getPackage();
-        }
-        if ($operation instanceof UninstallOperation) {
-            return $operation->getPackage();
-        }
-        return null;
     }
 }
