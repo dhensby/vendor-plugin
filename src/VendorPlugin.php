@@ -60,6 +60,7 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
      */
     public function activate(Composer $composer, IOInterface $io)
     {
+        $io->write('activating');
     }
 
     public static function getSubscribedEvents()
@@ -76,15 +77,17 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
     public function updateResources(Event $event)
     {
         $composer = $event->getComposer();
-        // map all existing resources
-        $existingResources = $this->mapExistingResources(
-            Util::joinPaths($composer->getPackage()->getTargetDir(), 'resources')
-        );
-        var_export($existingResources); die;
-        // iterate over all modules (including root module)
         $repo = $composer->getRepositoryManager()->getLocalRepository();
         $io = $event->getIO();
-        foreach ($repo->getPackages() as $package) {
+        $io->write('running ' . __FUNCTION__);
+        // map all existing resources
+        $existingResources = $this->mapExistingResources(
+            $path = Util::joinPaths($composer->getPackage()->getTargetDir(), 'resources')
+        );
+        $io->write('checking path ' . $path);
+        $io->write(var_export($existingResources, true));
+        // iterate over all modules (including root module)
+        foreach (array_combine([$composer->getPackage()], $repo->getPackages()) as $package) {
             if ($package->getType() !== self::MODULE_TYPE) {
                 continue;
             }
