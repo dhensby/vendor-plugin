@@ -65,8 +65,8 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
     public static function getSubscribedEvents()
     {
         return [
-            'post-install-command' => 'updateResources',
-            'post-update-command' => 'updateResources',
+            'post-install-cmd' => 'updateResources',
+            'post-update-cmd' => 'updateResources',
         ];
     }
 
