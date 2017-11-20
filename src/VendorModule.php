@@ -109,25 +109,6 @@ class VendorModule
     }
 
     /**
-     * Expose all web accessible paths for this module
-     *
-     * @param ExposeMethod $method
-     * @param string $target Replacement target for 'vendor' prefix to rewrite to. Defaults to 'resources'
-     */
-    public function exposePaths(ExposeMethod $method)
-    {
-        $folders = $this->getExposedFolders();
-        $sourcePath = $this->getInstallPath();
-        $targetPath = $this->getResourcePath();
-        foreach ($folders as $folder) {
-            // Get paths for this folder and delegate to expose method
-            $folderSourcePath = Util::joinPaths($sourcePath, $folder);
-            $folderTargetPath = Util::joinPaths($targetPath, $folder);
-            $method->exposeDirectory($folderSourcePath, $folderTargetPath);
-        }
-    }
-
-    /**
      * Get name of all folders to expose (relative to module root)
      *
      * @return array

@@ -90,23 +90,23 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
         $exposeMethod = $this->getMethod();
         // iterate over all modules (including root module)
         foreach (array_merge([$composer->getPackage()], $repo->getPackages()) as $package) {
+            // not a vendormodule, move on
             if ($package->getType() !== self::MODULE_TYPE) {
                 continue;
             }
             $module = new VendorModule($package, $event->getComposer());
-            if ($module) {
-                $name = $module->getName();
-                $folders = $module->getExposedFolders();
-                if (!empty($folders)) {
-                    $io->write("Exposing web directories for module <info>{$name}</info>:");
-                }
-                foreach($folders as $folder) {
-                    $io->write("  - <info>$folder</info>");
-                    $exposeMethod->exposeDirectory(
-                        Util::joinPaths($this->getProjectPath(), $module->getInstallPath(), $folder),
-                        Util::joinPaths($this->getProjectPath(), $module->getResourcePath(), $folder)
-                    );
-                }
+            $folders = $module->getExposedFolders();
+            if (empty($folders)) {
+                continue;
+            }
+            $name = $module->getName();
+            $io->write("Exposing web directories for module <info>{$name}</info>:");
+            foreach ($folders as $folder) {
+                $io->write("  - <info>$folder</info>");
+                $exposeMethod->exposeDirectory(
+                    Util::joinPaths($this->getProjectPath(), $module->getInstallPath(), $folder),
+                    Util::joinPaths($this->getProjectPath(), $module->getResourcePath(), $folder)
+                );
             }
         }
     }
@@ -126,8 +126,9 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
         $iterator = new RecursiveIteratorIterator($files);
         /** @var \DirectoryIterator $file */
         foreach ($iterator as $file) {
-            echo "checking {$file->getPathname()}" . PHP_EOL;
-            $fileMap[] = $file->getPath();
+            if ($file->isDir()) {
+                $fileMap[] = $file->getBasename();
+            }
         }
         return $fileMap;
     }
