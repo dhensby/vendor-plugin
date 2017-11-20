@@ -71,18 +71,6 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Get vendor module instance for this event
-     *
-     * @param Event $event
-     * @return VendorModule|null
-     */
-    protected function getVendorModule(Event $event)
-    {
-        // Build module
-        return VendorModule::createFromEvent($event);
-    }
-
-    /**
      * @param Event $event
      */
     public function updateResources(Event $event)
@@ -130,40 +118,6 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
     }
 
     /**
-     * Install resources from an installed or updated package
-     *
-     * @param PackageEvent $event
-     */
-    public function installPackage(PackageEvent $event)
-    {
-        // Check and log all folders being exposed
-        $module = $this->getVendorModule($event);
-        if (!$module) {
-            return;
-        }
-
-        // Skip if module has no public resources
-        $folders = $module->getExposedFolders();
-        if (empty($folders)) {
-            return;
-        }
-
-        // Log details
-        $name = $module->getName();
-        $event->getIO()->write("Exposing web directories for module <info>{$name}</info>:");
-        foreach ($folders as $folder) {
-            $event->getIO()->write("  - <info>$folder</info>");
-        }
-
-        // Setup root folder
-        $this->setupResources();
-
-        // Expose web dirs with given method
-        $method = $this->getMethod();
-        $module->exposePaths($method);
-    }
-
-    /**
      * @return string
      */
     protected function getProjectPath()
@@ -190,37 +144,6 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
             if ($file->isFile() && !file_exists($targetPath)) {
                 copy($file->getPathname(), $targetPath);
             }
-        }
-    }
-
-    /**
-     * Remove package
-     *
-     * @param PackageEvent $event
-     */
-    public function uninstallPackage(PackageEvent $event)
-    {
-        // Ensure package is the valid type
-        $module = $this->getVendorModule($event);
-        if (!$module) {
-            return;
-        }
-
-        // Check path to remove
-        $target = $module->getResourcePath();
-        if (!is_dir($target)) {
-            return;
-        }
-
-        // Remove directory
-        $name = $module->getName();
-        $event->getIO()->write("Removing web directories for module <info>{$name}</info>:");
-        $this->filesystem->removeDirectory($target);
-
-        // Cleanup empty vendor dir if this is the last module
-        $vendorTarget = dirname($target);
-        if ($this->filesystem->isDirEmpty($vendorTarget)) {
-            $this->filesystem->removeDirectory($vendorTarget);
         }
     }
 
