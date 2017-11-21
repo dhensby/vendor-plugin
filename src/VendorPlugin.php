@@ -122,12 +122,17 @@ class VendorPlugin implements PluginInterface, EventSubscriberInterface
         if (!file_exists($path)) {
             return $fileMap;
         }
-        $files = new RecursiveDirectoryIterator($path);
-        $iterator = new RecursiveIteratorIterator($files);
-        /** @var \DirectoryIterator $file */
-        foreach ($iterator as $file) {
-            echo "checking {$file->getPathname()}" . PHP_EOL;
-            $fileMap[] = $file->getPath();
+        $resourceFolders = new RecursiveDirectoryIterator($path);
+        /** @var \SplFileInfo $folder */
+        foreach ($resourceFolders as $folder) {
+            if (substr($folder->getBasename(), 0, 1) !== '.') {
+                $subFolders = new RecursiveDirectoryIterator($folder->getPathname());
+                foreach ($subFolders as $subFolder) {
+                    if (substr($subFolder->getBasename(), 0, 1) !== '.') {
+                        $fileMap[] = $subFolder->getPathname();
+                    }
+                }
+            }
         }
         return $fileMap;
     }

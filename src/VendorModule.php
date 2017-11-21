@@ -3,15 +3,10 @@
 namespace SilverStripe\VendorPlugin;
 
 use Composer\Composer;
-use Composer\DependencyResolver\Operation\InstallOperation;
-use Composer\DependencyResolver\Operation\UninstallOperation;
-use Composer\DependencyResolver\Operation\UpdateOperation;
+use Composer\Factory;
 use Composer\Package\PackageInterface;
 use Composer\Package\RootPackageInterface;
-use Composer\Script\Event;
-use Composer\Json\JsonFile;
 use LogicException;
-use SilverStripe\VendorPlugin\Methods\ExposeMethod;
 
 /**
  * Represents a module in the vendor folder
@@ -89,7 +84,7 @@ class VendorModule
     public function getInstallPath()
     {
         if ($this->isProject()) {
-            return $this->getPackage()->getTargetDir();
+            return Util::joinPaths(dirname(realpath(Factory::getComposerFile())), $this->getPackage()->getTargetDir());
         }
         return $this->getComposer()->getInstallationManager()->getInstallPath($this->getPackage());
     }
